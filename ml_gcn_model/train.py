@@ -19,7 +19,7 @@ parser.add_argument('--epoch_step', default=[40], type=int, nargs='+',
                     help='number of epochs to change learning rate')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=32, type=int,
+parser.add_argument('-b', '--batch-size', default=8, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate')

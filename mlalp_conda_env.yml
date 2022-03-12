@@ -73,4 +73,4 @@ dependencies:
   - pip:
     - pillow==7.0.0
     - torchvision==0.2.0
-prefix: /home/nanmu/anaconda3/envs/mlalp
+prefix: F:\anaconda\anaconda3\envs\mlalp

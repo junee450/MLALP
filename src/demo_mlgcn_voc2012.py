@@ -25,7 +25,7 @@ parser.add_argument('--data', default='../data/voc2012', type=str,
                     help='path to dataset (e.g. data/')
 parser.add_argument('--image_size', default=448, type=int,
                     metavar='N', help='image size (default: 224)')
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch_size', default=10, type=int,
                     metavar='N', help='batch size (default: 32)')
 parser.add_argument('--adv_batch_size', default=18, type=int,
                     metavar='N', help='batch size ml_cw, ml_rank1, ml_rank2 18, ml_lp 10, ml_deepfool is 10')
@@ -189,7 +189,7 @@ def evaluate_model(model):
 def evaluate_adv_(state):
     model = state['model']
     y_target = state['y_target']
-
+    y_target = y_target[0:80]
     adv_folder_path = os.path.join(args.adv_save_x, args.adv_method, 'tmp/')
     adv_file_list = os.listdir(adv_folder_path)
     adv_file_list.sort(key=lambda x:int(x[16:-4]))
@@ -220,6 +220,7 @@ def evaluate_adv_(state):
     max_r = []
     mean_r = []
     rmsd = []
+    i = 0
     with torch.no_grad():
         for batch_adv_x, batch_test_x in zip(dl1, dl2):
             if use_gpu:
@@ -237,6 +238,12 @@ def evaluate_adv_(state):
             norm_1.extend(np.sum(np.abs(batch_adv_x - batch_test_x), axis=(1, 2, 3)))
             max_r.extend(np.max(np.abs(batch_adv_x - batch_test_x), axis=(1, 2, 3)))
             mean_r.extend(np.mean(np.abs(batch_adv_x - batch_test_x), axis=(1, 2, 3)))
+            
+            #test
+            i = i + 1
+            if i == 8:
+              break
+            
     adv_output = np.asarray(adv_output)
     adv_pred = adv_output.copy()
     adv_pred[adv_pred >= (0.5+0)] = 1
@@ -267,7 +274,7 @@ def evaluate_adv_(state):
     y_target[y_target==-1] = 0
     metrics['ranking_loss'] = evaluate_metrics.label_ranking_loss(y_target, adv_output)
     metrics['average_precision'] = evaluate_metrics.label_ranking_average_precision_score(y_target, adv_output)
-    metrics['auc'] = evaluate_metrics.roc_auc_score(y_target, adv_output)
+    #metrics['auc'] = evaluate_metrics.roc_auc_score(y_target, adv_output)
     metrics['attack rate'] = np.sum(adv_pred_match_target) / len(adv_pred_match_target)
     metrics['norm'] = np.mean(norm)
     metrics['norm_1'] = np.mean(norm_1)
@@ -313,13 +320,14 @@ def evaluate_adv(state):
     rmsd = []
     import matplotlib
     import matplotlib.image as plot_img
-    show_idx = 52
+    show_idx = 1
     batch_idx = 0
     with torch.no_grad():
         for batch_adv_x, batch_test_x in zip(dl1, dl2):
             if show_idx // args.batch_size > batch_idx:
                 batch_idx = batch_idx + 1
                 continue
+            save_idx = show_idx
             show_idx = show_idx % args.batch_size
 
             if use_gpu:
@@ -332,8 +340,8 @@ def evaluate_adv(state):
             batch_test_x = batch_test_x[0][0].cpu().numpy()
 
 
-            plot_img.imsave('original.pdf', batch_test_x[show_idx].transpose(1,2,0))
-            plot_img.imsave('{}_adv.pdf'.format(args.adv_method), batch_adv_x[show_idx].transpose(1,2,0))
+            plot_img.imsave('{}.pdf'.format(save_idx), batch_test_x[show_idx].transpose(1,2,0))
+            plot_img.imsave('{}_adv.pdf'.format(save_idx), batch_adv_x[show_idx].transpose(1,2,0))
             #distortion = batch_adv_x[show_idx].transpose(1,2,0) - batch_test_x[show_idx].transpose(1,2,0)
             distortion = batch_adv_x[show_idx] - batch_test_x[show_idx]
             #matplotlib.image.imsave('{}_distortion.jpg'.format(args.adv_method),(distortion - np.min(distortion))/ (np.max(distortion)-np.min(distortion)))
@@ -400,7 +408,7 @@ def evaluate_adv(state):
     adv_pred = adv_output.copy()
     adv_pred[adv_pred >= (0.5+0)] = 1
     adv_pred[adv_pred < (0.5+0)] = -1
-    adv_pred_match_target = np.all((adv_pred == y_target), axis=1) + 0
+    adv_pred_match_target = np.all((adv_pred == y_target), axis=0) + 0
     attack_fail_idx = np.argwhere(adv_pred_match_target==0).flatten()
 
     norm = np.asarray(norm)
@@ -435,7 +443,7 @@ def main():
         torch.cuda.manual_seed_all(123)
     np.random.seed(123)
 
-    init_log(os.path.join(args.adv_save_x, args.adv_method, args.target_type + '.log'))
+    init_log(os.path.join(args.adv_save_x, args.adv_method, args.target_type, '0.1' + '.log'))
 
     # define dataset
     num_classes = 20
@@ -478,15 +486,16 @@ def main():
              'adv_batch_size': args.adv_batch_size,
              'y_target':y_target,
              'y': y,
-             'adv_save_x': os.path.join(args.adv_save_x, args.adv_method, args.target_type + '.npy'),
+             'adv_save_x': os.path.join(args.adv_save_x, args.adv_method, args.target_type, '0.1' + '.npy'),
              'adv_begin_step': args.adv_begin_step
              }
 
     # start attack
-    attack_model = AttackModel(state)
-    attack_model.attack()
+    # attack_model = AttackModel(state)
+    # attack_model.attack()
 
-    #evaluate_adv(state)
+    #evaluate_adv_(state)
+    evaluate_adv(state)
     #evaluate_model(model)
 
 if __name__ == '__main__':

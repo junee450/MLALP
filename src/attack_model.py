@@ -6,10 +6,12 @@ from attacks.ml_rank1_pytorch import MLRank1
 from attacks.ml_rank2_pytorch import MLRank2
 from attacks.ml_deepfool_pytorch import MLDeepFool
 from attacks.mla_lp import MLLP
+from attacks.ml_jsma_pytorch import MLJSMA
 import numpy as np
 import os
 import math
 from tqdm import tqdm
+import sys
 
 tqdm.monitor_interval = 0
 class AttackModel():
@@ -74,9 +76,42 @@ class AttackModel():
                       'clip_min': clip_min,
                       'clip_max': clip_max}
             self.ml_deepfool(params)
+        elif self.state['adv_method'] == 'jsma':
+            self.attack_model = MLJSMA(self.model)
+            params = {'y_target': None,
+                      'theta': 0.1,
+                      'gamma': 1.0,
+                      'clip_min': clip_min,
+                      'clip_max': clip_max}
+            self.jsma(params)
         else:
             print('please choose a correct adv method')
 
+    def jsma(self, params):
+        _, A_pos, A_neg, B_pos, B_neg = get_target_set(self.y, self.y_target)
+        A = A_pos + A_neg
+
+        tmp_folder_path = os.path.join(os.path.dirname(self.adv_save_x), 'tmp0.1/')
+        new_folder(tmp_folder_path)
+        begin_step = self.adv_begin_step
+        batch_size = self.adv_batch_size
+        step = math.ceil(len(self.y_target) / batch_size)
+        print(params)
+
+        for i, (input, target) in enumerate(self.data_loader):
+            print('{} generator data, length is {}'.format(i, len(input[0])))
+            if i < begin_step:
+                continue
+            params['batch_size'] = len(target)
+            begin = i * batch_size
+            end = begin + len(target)
+            params['y_target'] = self.y_target[begin:end]
+
+            adv = self.attack_model.generate_np(input[0].cpu().numpy(), **params)
+            # sys.exit()
+            tmp_file_path = os.path.join(tmp_folder_path, os.path.basename(self.adv_save_x) + '_' + str(i) + '.npy')
+            np.save(tmp_file_path, adv)
+    
     def mla_lp(self, params):
         _, A_pos, A_neg, B_pos, B_neg = get_target_set(self.y, self.y_target)
         A = A_pos + A_neg
